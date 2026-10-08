@@ -1,104 +1,168 @@
-let allErrors = [];
+let errors = [];
+
+let stats = {};
+
+let environments = [];
+
+let severityChart = null;
+
+let typeChart = null;
 
 
-const logInput =
-    document.getElementById("logInput");
+const $ = id =>
+    document.getElementById(id);
 
-const fileInput =
-    document.getElementById("fileInput");
 
-const fileName =
-    document.getElementById("fileName");
+function escapeHtml(value) {
 
-const analyzeButton =
-    document.getElementById("analyzeButton");
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
 
-const loading =
-    document.getElementById("loading");
+}
 
-const results =
-    document.getElementById("results");
 
-const errorList =
-    document.getElementById("errorList");
+/* TABS */
 
-const overviewBody =
-    document.getElementById("overviewBody");
+document.querySelectorAll(".tab").forEach(button => {
 
-const searchInput =
-    document.getElementById("searchInput");
+    button.addEventListener("click", () => {
 
-const severityFilter =
-    document.getElementById(
-        "severityFilter"
+        const name =
+            button.dataset.tab;
+
+
+        document
+            .querySelectorAll(".tab")
+            .forEach(x => {
+
+                x.classList.toggle(
+                    "active",
+                    x.dataset.tab === name
+                );
+
+            });
+
+
+        document
+            .querySelectorAll(".tab-panel")
+            .forEach(x => {
+
+                x.classList.toggle(
+                    "active",
+                    x.id === name
+                );
+
+            });
+
+
+        if (name === "history") {
+
+            loadHistory();
+
+            loadKnowledge();
+
+        }
+
+    });
+
+});
+
+
+/* FILE */
+
+$("fileInput")
+    .addEventListener(
+        "change",
+        async event => {
+
+            const file =
+                event.target.files[0];
+
+
+            if (!file) {
+
+                return;
+
+            }
+
+
+            $("fileName")
+                .textContent =
+                file.name;
+
+
+            try {
+
+                $("logInput").value =
+                    await file.text();
+
+            }
+
+            catch {
+
+                $("fileName")
+                    .textContent =
+                    "Could not read file";
+
+            }
+
+        }
     );
 
 
-fileInput.addEventListener(
-    "change",
-    async function () {
+/* ANALYZE */
 
-        const file =
-            fileInput.files[0];
-
-        if (!file) {
-            return;
-        }
-
-        fileName.textContent =
-            file.name;
-
-        const text =
-            await file.text();
-
-        logInput.value =
-            text;
-    }
-);
+$("analyzeBtn")
+    .addEventListener(
+        "click",
+        analyze
+    );
 
 
-analyzeButton.addEventListener(
-    "click",
-    analyzeLog
-);
-
-
-searchInput.addEventListener(
-    "input",
-    renderErrors
-);
-
-
-severityFilter.addEventListener(
-    "change",
-    renderErrors
-);
-
-
-async function analyzeLog() {
+async function analyze() {
 
     const text =
-        logInput.value.trim();
+        $("logInput")
+            .value
+            .trim();
+
 
     if (!text) {
 
-        alert(
-            "Please upload or paste a log."
-        );
+        $("analyzeStatus")
+            .innerHTML =
+            `
+            <div class="status error">
+                Please upload or paste a log.
+            </div>
+            `;
 
         return;
+
     }
 
-    loading.classList.remove(
-        "hidden"
-    );
 
-    results.classList.add(
-        "hidden"
-    );
-
-    analyzeButton.disabled =
+    $("analyzeBtn").disabled =
         true;
+
+
+    $("analyzeBtn")
+        .textContent =
+        "Analyzing...";
+
+
+    $("analyzeStatus")
+        .innerHTML =
+        `
+        <div class="status">
+            Analyzing log...
+        </div>
+        `;
+
 
     try {
 
@@ -106,6 +170,7 @@ async function analyzeLog() {
             await fetch(
                 "/api/analyze",
                 {
+
                     method: "POST",
 
                     headers: {
@@ -113,409 +178,1109 @@ async function analyzeLog() {
                             "application/json"
                     },
 
-                    body: JSON.stringify({
-                        text: text,
-                        source_name:
-                            fileInput.files[0]
-                                ? fileInput.files[0].name
-                                : "Pasted Log"
-                    })
+                    body:
+                        JSON.stringify({
+
+                            text: text,
+
+                            source_name:
+                                $("fileInput")
+                                    .files[0]
+                                    ?.name
+                                ||
+                                "Pasted Log"
+
+                        })
+
                 }
             );
 
+
         const data =
             await response.json();
+
 
         if (!response.ok) {
 
             throw new Error(
                 data.error ||
-                "Analysis failed."
+                "Analysis failed"
             );
+
         }
 
-        allErrors =
+
+        errors =
             data.errors || [];
 
-        document.getElementById(
-            "environment"
-        ).textContent =
-            (
-                data.environment || []
-            ).join(" · ");
 
-        document.getElementById(
-            "totalLines"
-        ).textContent =
-            data.stats.total_lines;
+        stats =
+            data.stats || {};
 
-        document.getElementById(
-            "totalErrors"
-        ).textContent =
-            data.stats.total_errors;
 
-        document.getElementById(
-            "criticalErrors"
-        ).textContent =
-            data.stats.critical;
+        environments =
+            data.environments ||
+            ["General"];
 
-        document.getElementById(
-            "uniqueErrors"
-        ).textContent =
-            data.stats.unique_errors;
 
-        results.classList.remove(
-            "hidden"
-        );
+        renderResults();
 
-        renderErrors();
 
-        await loadKnowledge();
+        $("analyzeStatus")
+            .innerHTML =
+            `
+            <div class="status">
+                Analysis completed.
+                Open the Results tab to view the diagnosis.
+            </div>
+            `;
 
-        window.scrollTo({
-            top: results.offsetTop - 20,
-            behavior: "smooth"
-        });
 
-    } catch (error) {
+        document
+            .querySelector(
+                '[data-tab="results"]'
+            )
+            .click();
 
-        alert(
-            error.message
-        );
 
-    } finally {
+        loadKnowledge();
 
-        loading.classList.add(
-            "hidden"
-        );
-
-        analyzeButton.disabled =
-            false;
     }
+
+    catch (error) {
+
+        $("analyzeStatus")
+            .innerHTML =
+            `
+            <div class="status error">
+                ${escapeHtml(error.message)}
+            </div>
+            `;
+
+    }
+
+    finally {
+
+        $("analyzeBtn")
+            .disabled =
+            false;
+
+
+        $("analyzeBtn")
+            .textContent =
+            "Analyze Log";
+
+    }
+
 }
 
 
-function renderErrors() {
+/* RESULTS */
 
-    const search =
-        searchInput.value
-            .trim()
-            .toLowerCase();
+function renderResults() {
 
-    const severity =
-        severityFilter.value;
+    $("emptyResults")
+        .classList
+        .add("hidden");
 
-    const filtered =
-        allErrors.filter(
-            error => {
 
-                if (
-                    severity !== "ALL"
-                    &&
-                    error.severity !== severity
-                ) {
-                    return false;
-                }
+    $("resultsContent")
+        .classList
+        .remove("hidden");
 
-                if (!search) {
-                    return true;
-                }
 
-                const text = [
-                    error.type,
-                    error.message,
-                    error.file,
+    $("environmentCard")
+        .innerHTML =
+        `
+        <div class="stat-title">
+            DETECTED ENVIRONMENT
+        </div>
+
+        <div class="environment-title">
+            ${escapeHtml(
+                environments.join(" · ")
+            )}
+        </div>
+        `;
+
+
+    $("totalLines")
+        .textContent =
+        stats.total_lines || 0;
+
+
+    $("totalErrors")
+        .textContent =
+        stats.total_errors || 0;
+
+
+    $("criticalErrors")
+        .textContent =
+        stats.critical || 0;
+
+
+    $("uniqueErrors")
+        .textContent =
+        stats.unique_errors || 0;
+
+
+    renderErrors();
+
+    renderCharts();
+
+}
+
+
+/* FILTER */
+
+function getSelectedSeverities() {
+
+    return Array
+        .from(
+            $("severityFilter")
+                .selectedOptions
+        )
+        .map(x => x.value);
+
+}
+
+
+function getFilteredErrors() {
+
+    const query =
+        $("searchInput")
+            .value
+            .toLowerCase()
+            .trim();
+
+
+    const selected =
+        getSelectedSeverities();
+
+
+    return errors.filter(
+        error => {
+
+            if (
+                !selected.includes(
                     error.severity
+                )
+            ) {
+
+                return false;
+
+            }
+
+
+            if (!query) {
+
+                return true;
+
+            }
+
+
+            const searchable =
+                [
+
+                    error.type,
+
+                    error.message,
+
+                    error.file
+
                 ]
                     .join(" ")
                     .toLowerCase();
 
-                return text.includes(
-                    search
-                );
-            }
-        );
 
-    errorList.innerHTML = "";
+            return searchable
+                .includes(query);
 
-    overviewBody.innerHTML = "";
-
-    filtered.forEach(
-        error => {
-
-            renderErrorCard(
-                error
-            );
-
-            renderOverviewRow(
-                error
-            );
         }
     );
+
 }
 
 
-function renderErrorCard(error) {
+/* ERROR CARDS */
 
-    const explanation =
-        error.explanation || {};
+function renderErrors() {
 
-    const card =
-        document.createElement(
-            "article"
-        );
+    const filtered =
+        getFilteredErrors();
 
-    card.className =
-        "error-card";
 
-    const severityClass =
-        error.severity === "Critical"
-            ? "badge-critical"
-            : error.severity === "Warning"
-                ? "badge-warning"
-                : "badge-error";
+    $("errorCards")
+        .innerHTML =
+        filtered
+            .map(
+                error =>
+                    createErrorCard(error)
+            )
+            .join("");
 
-    let sourcesHtml = "";
 
-    if (
-        explanation.source ===
-            "AI Research"
-        &&
-        explanation.confidence >= 0.70
-        &&
-        explanation.source_links
-        &&
-        explanation.source_links.length
-    ) {
+    if (!filtered.length) {
 
-        sourcesHtml =
+        $("errorCards")
+            .innerHTML =
             `
-            <h4>RELATED RESOURCES</h4>
-            <div class="source-list">
-                ${
-                    explanation.source_links
-                        .map(
-                            source => `
-                            <div>
-                                <a
-                                    href="${escapeHtml(source.url)}"
-                                    target="_blank"
-                                    rel="noopener"
-                                >
-                                    ${escapeHtml(source.title)}
-                                </a>
-                            </div>
-                            `
-                        )
-                        .join("")
-                }
+            <div class="info-box">
+                No errors match the current filters.
             </div>
             `;
+
     }
 
-    let codeHtml = "";
+
+    $("errorTable")
+        .innerHTML =
+        filtered
+            .map(
+                error =>
+                    `
+                    <tr>
+
+                        <td>
+                            ${escapeHtml(
+                                error.type ||
+                                "Unknown Error"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                error.severity ||
+                                "Error"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                error.file ||
+                                "Unknown"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                error.line ||
+                                "-"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                error.occurrences ||
+                                1
+                            )}
+                        </td>
+
+                    </tr>
+                    `
+            )
+            .join("");
+
+}
+
+
+function createErrorCard(error) {
+
+    const explanation =
+        error.explanation ||
+        {};
+
+
+    const confidence =
+        Number(
+            explanation.confidence ||
+            0
+        );
+
+
+    const source =
+        explanation.source ||
+        "Unknown";
+
+
+    const category =
+        explanation.category ||
+        environments[0] ||
+        "General";
+
+
+    const component =
+        explanation.component ||
+        "General";
+
+
+    const file =
+        error.file ||
+        "Unknown";
+
+
+    const line =
+        error.line ||
+        "-";
+
+
+    let resources = "";
+
+
+    const links =
+        explanation.source_links ||
+        [];
+
+
+    if (
+        links.length &&
+        source === "AI Research" &&
+        confidence >= 0.70
+    ) {
+
+        resources =
+            `
+            <div class="section-title">
+                ◈ Related resources
+            </div>
+
+            ${
+                links
+                    .map(
+                        item =>
+                            `
+                            <div class="resource">
+
+                                <a
+                                    href="${escapeHtml(
+                                        item.url ||
+                                        "#"
+                                    )}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    ${escapeHtml(
+                                        item.title ||
+                                        "Source"
+                                    )}
+                                </a>
+
+                            </div>
+                            `
+                    )
+                    .join("")
+            }
+            `;
+
+    }
+
+
+    let code = "";
+
 
     if (explanation.code) {
 
-        codeHtml =
+        code =
             `
-            <h4>SUGGESTED CHANGE</h4>
-            <pre>${escapeHtml(
+            <div class="section-title">
+                ▣ Suggested change
+            </div>
+
+            <pre class="code-block">${escapeHtml(
                 explanation.code
             )}</pre>
             `;
+
     }
 
-    card.innerHTML = `
-        <div class="error-heading">
 
-            <div>
+    return `
+        <article class="error-card">
 
-                <div class="error-type">
-                    ◆ ${escapeHtml(
-                        error.type
+            <div class="error-title">
+                ◆ ${escapeHtml(
+                    error.type ||
+                    "Unknown Error"
+                )}
+            </div>
+
+
+            <div class="badges">
+
+                <span class="badge">
+                    ${escapeHtml(
+                        String(
+                            error.severity ||
+                            "Error"
+                        ).toUpperCase()
+                    )}
+                </span>
+
+
+                <span class="badge">
+                    ${escapeHtml(category)}
+                </span>
+
+
+                <span class="badge">
+                    ${escapeHtml(component)}
+                </span>
+
+            </div>
+
+
+            <div class="error-meta">
+
+                <div class="meta-label">
+                    LOCATION
+                </div>
+
+                <div>
+                    ${escapeHtml(file)}:${escapeHtml(line)}
+                </div>
+
+
+                <div class="meta-label">
+                    OCCURRENCES
+                </div>
+
+                <div>
+                    ${escapeHtml(
+                        error.occurrences ||
+                        1
                     )}
                 </div>
 
-                <div class="badges">
 
-                    <span class="badge ${severityClass}">
-                        ${escapeHtml(
-                            error.severity.toUpperCase()
-                        )}
-                    </span>
+                <div class="meta-label">
+                    KNOWLEDGE SOURCE
+                </div>
 
-                    <span class="badge">
-                        ${escapeHtml(
-                            explanation.category ||
-                            "General"
-                        )}
-                    </span>
-
-                    <span class="badge">
-                        ${escapeHtml(
-                            explanation.component ||
-                            "General"
-                        )}
-                    </span>
-
+                <div>
+                    ${escapeHtml(source)}
+                    · Confidence
+                    ${Math.round(
+                        confidence * 100
+                    )}%
                 </div>
 
             </div>
 
-        </div>
 
-        <div class="error-meta">
+            <div class="section-title">
+                ⌁ What happened
+            </div>
 
-            LOCATION:
-            ${escapeHtml(
-                error.file || "Unknown"
-            )}:${escapeHtml(
-                String(
-                    error.line || "-"
-                )
-            )}
-
-            <br><br>
-
-            OCCURRENCES:
-            ${escapeHtml(
-                String(
-                    error.occurrences || 1
-                )
-            )}
-
-            <br><br>
-
-            KNOWLEDGE SOURCE:
-            ${escapeHtml(
-                explanation.source ||
-                "Unknown"
-            )}
-            · Confidence
-            ${Math.round(
-                (
-                    explanation.confidence ||
-                    0
-                ) * 100
-            )}%
-
-        </div>
-
-        <div class="diagnosis">
-
-            <h4>⌁ WHAT HAPPENED</h4>
-
-            <p>
+            <div>
                 ${escapeHtml(
                     explanation.description ||
                     "No explanation available."
                 )}
-            </p>
+            </div>
 
-            <h4>⌁ LIKELY CAUSE</h4>
 
-            <p>
+            <div class="section-title">
+                ⌁ Likely cause
+            </div>
+
+            <div>
                 ${escapeHtml(
                     explanation.cause ||
                     "No sufficiently reliable cause was identified."
                 )}
-            </p>
+            </div>
 
-            <h4>▣ FIX</h4>
 
-            <p>
+            <div class="section-title">
+                ▣ Fix
+            </div>
+
+            <div>
                 ${escapeHtml(
                     explanation.fix ||
-                    "Review the stack trace and affected component."
+                    "Review the stack trace and investigate the affected component."
                 )}
-            </p>
+            </div>
 
-            ${codeHtml}
 
-            ${sourcesHtml}
+            ${code}
 
-            <details class="raw-log">
+
+            ${resources}
+
+
+            <details>
 
                 <summary>
                     View raw log
                 </summary>
 
-                <pre>${escapeHtml(
-                    error.raw || ""
+                <pre class="raw-log">${escapeHtml(
+                    error.raw ||
+                    ""
                 )}</pre>
 
             </details>
 
-        </div>
+        </article>
     `;
 
-    errorList.appendChild(
-        card
-    );
 }
 
 
-function renderOverviewRow(error) {
+/* SEARCH */
 
-    const row =
-        document.createElement(
-            "tr"
+$("searchInput")
+    .addEventListener(
+        "input",
+        renderErrors
+    );
+
+
+$("severityFilter")
+    .addEventListener(
+        "change",
+        renderErrors
+    );
+
+
+/* CHARTS */
+
+function renderCharts() {
+
+    const severity =
+        stats.severity ||
+        {};
+
+
+    const types =
+        stats.types ||
+        {};
+
+
+    if (severityChart) {
+
+        severityChart.destroy();
+
+    }
+
+
+    if (typeChart) {
+
+        typeChart.destroy();
+
+    }
+
+
+    severityChart =
+        new Chart(
+            $("severityChart"),
+            {
+
+                type: "bar",
+
+                data: {
+
+                    labels:
+                        Object.keys(
+                            severity
+                        ),
+
+                    datasets: [
+
+                        {
+
+                            label:
+                                "Count",
+
+                            data:
+                                Object.values(
+                                    severity
+                                )
+
+                        }
+
+                    ]
+
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio:
+                        false,
+
+                    plugins: {
+
+                        title: {
+
+                            display: true,
+
+                            text:
+                                "Severity Distribution",
+
+                            color:
+                                "#ddd"
+
+                        },
+
+                        legend: {
+
+                            display:
+                                false
+
+                        }
+
+                    },
+
+                    scales: {
+
+                        x: {
+
+                            ticks: {
+                                color: "#aaa"
+                            },
+
+                            grid: {
+                                color:
+                                    "rgba(255,255,255,.05)"
+                            }
+
+                        },
+
+                        y: {
+
+                            ticks: {
+                                color: "#aaa"
+                            },
+
+                            grid: {
+                                color:
+                                    "rgba(255,255,255,.05)"
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
         );
 
-    row.innerHTML = `
-        <td>
-            ${escapeHtml(
-                String(error.id)
-            )}
-        </td>
 
-        <td>
-            ${escapeHtml(
-                error.type
-            )}
-        </td>
+    typeChart =
+        new Chart(
+            $("typeChart"),
+            {
 
-        <td>
-            ${escapeHtml(
-                error.severity
-            )}
-        </td>
+                type: "bar",
 
-        <td>
-            ${escapeHtml(
-                error.message
-            )}
-        </td>
+                data: {
 
-        <td>
-            ${escapeHtml(
-                error.file || "-"
-            )}
-        </td>
+                    labels:
+                        Object.keys(
+                            types
+                        ),
 
-        <td>
-            ${escapeHtml(
-                String(
-                    error.line || "-"
-                )
-            )}
-        </td>
+                    datasets: [
 
-        <td>
-            ${escapeHtml(
-                String(
-                    error.occurrences || 1
-                )
-            )}
-        </td>
-    `;
+                        {
 
-    overviewBody.appendChild(
-        row
-    );
+                            label:
+                                "Count",
+
+                            data:
+                                Object.values(
+                                    types
+                                )
+
+                        }
+
+                    ]
+
+                },
+
+                options: {
+
+                    responsive: true,
+
+                    maintainAspectRatio:
+                        false,
+
+                    plugins: {
+
+                        title: {
+
+                            display: true,
+
+                            text:
+                                "Error Types",
+
+                            color:
+                                "#ddd"
+
+                        },
+
+                        legend: {
+
+                            display:
+                                false
+
+                        }
+
+                    },
+
+                    scales: {
+
+                        x: {
+
+                            ticks: {
+                                color: "#aaa"
+                            },
+
+                            grid: {
+                                color:
+                                    "rgba(255,255,255,.05)"
+                            }
+
+                        },
+
+                        y: {
+
+                            ticks: {
+                                color: "#aaa"
+                            },
+
+                            grid: {
+                                color:
+                                    "rgba(255,255,255,.05)"
+                            }
+
+                        }
+
+                    }
+
+                }
+
+            }
+        );
+
 }
 
+
+/* DOWNLOAD */
+
+function downloadFile(
+    name,
+    content,
+    type
+) {
+
+    const blob =
+        new Blob(
+            [content],
+            {type: type}
+        );
+
+
+    const url =
+        URL.createObjectURL(blob);
+
+
+    const a =
+        document.createElement("a");
+
+
+    a.href = url;
+
+    a.download = name;
+
+    a.click();
+
+
+    URL.revokeObjectURL(url);
+
+}
+
+
+/* JSON */
+
+$("jsonBtn")
+    .addEventListener(
+        "click",
+        () => {
+
+            downloadFile(
+
+                "logscope_results.json",
+
+                JSON.stringify(
+                    errors,
+                    null,
+                    2
+                ),
+
+                "application/json"
+
+            );
+
+        }
+    );
+
+
+/* CSV */
+
+$("csvBtn")
+    .addEventListener(
+        "click",
+        () => {
+
+            const rows = [
+
+                [
+                    "Type",
+                    "Severity",
+                    "Message",
+                    "File",
+                    "Line",
+                    "Occurrences"
+                ]
+
+            ];
+
+
+            errors.forEach(
+                error => {
+
+                    rows.push(
+
+                        [
+
+                            error.type ||
+                                "",
+
+                            error.severity ||
+                                "",
+
+                            error.message ||
+                                "",
+
+                            error.file ||
+                                "",
+
+                            error.line ||
+                                "",
+
+                            error.occurrences ||
+                                1
+
+                        ]
+
+                    );
+
+                }
+            );
+
+
+            const csv =
+                rows
+                    .map(
+                        row =>
+                            row
+                                .map(
+                                    value =>
+                                        `"${String(
+                                            value
+                                        ).replaceAll(
+                                            '"',
+                                            '""'
+                                        )}"`
+                                )
+                                .join(",")
+                    )
+                    .join("\n");
+
+
+            downloadFile(
+
+                "logscope_results.csv",
+
+                csv,
+
+                "text/csv"
+
+            );
+
+        }
+    );
+
+
+/* HISTORY */
+
+async function loadHistory() {
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/history"
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error ||
+                "Could not load history"
+            );
+
+        }
+
+
+        const history =
+            data.history ||
+            [];
+
+
+        if (!history.length) {
+
+            $("historyContent")
+                .innerHTML =
+                "No previous analyses found.";
+
+            return;
+
+        }
+
+
+        $("historyContent")
+            .innerHTML =
+            `
+            <div class="table-wrap">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+
+                            <th>ID</th>
+
+                            <th>Source</th>
+
+                            <th>Lines</th>
+
+                            <th>Errors</th>
+
+                            <th>Critical</th>
+
+                            <th>Warnings</th>
+
+                            <th>Unique</th>
+
+                            <th>Created</th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        ${
+                            history
+                                .map(
+                                    item =>
+                                        `
+                                        <tr>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.id
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.source_name
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.total_lines
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.total_errors
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.critical
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.warnings
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.unique_errors
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.created_at
+                                                )}
+                                            </td>
+
+                                        </tr>
+                                        `
+                                )
+                                .join("")
+                        }
+
+                    </tbody>
+
+                </table>
+
+            </div>
+            `;
+
+    }
+
+    catch (error) {
+
+        $("historyContent")
+            .innerHTML =
+            `
+            <span class="status error">
+                ${escapeHtml(
+                    error.message
+                )}
+            </span>
+            `;
+
+    }
+
+}
+
+
+/* KNOWLEDGE */
 
 async function loadKnowledge() {
 
@@ -526,208 +1291,58 @@ async function loadKnowledge() {
                 "/api/knowledge"
             );
 
-        const data =
-            await response.json();
-
-        document.getElementById(
-            "kbTotal"
-        ).textContent =
-            data.total || 0;
-
-        document.getElementById(
-            "kbBuiltin"
-        ).textContent =
-            data.built_in || 0;
-
-        document.getElementById(
-            "kbLearned"
-        ).textContent =
-            data.learned || 0;
-
-        document.getElementById(
-            "kbConfidence"
-        ).textContent =
-            Math.round(
-                (
-                    data.average_confidence ||
-                    0
-                ) * 100
-            ) + "%";
-
-    } catch (error) {
-
-        console.error(
-            error
-        );
-    }
-}
-
-
-document.getElementById(
-    "historyButton"
-).addEventListener(
-    "click",
-    loadHistory
-);
-
-
-async function loadHistory() {
-
-    const container =
-        document.getElementById(
-            "historyTable"
-        );
-
-    container.innerHTML =
-        "Loading...";
-
-    try {
-
-        const response =
-            await fetch(
-                "/api/history"
-            );
 
         const data =
             await response.json();
 
-        if (
-            !data.history ||
-            !data.history.length
-        ) {
 
-            container.innerHTML =
-                "<p class='muted'>No previous analyses.</p>";
+        if (!response.ok) {
 
             return;
+
         }
 
-        container.innerHTML = `
-            <div style="overflow-x:auto">
 
-                <table>
+        const kb =
+            data.stats ||
+            data;
 
-                    <thead>
 
-                        <tr>
-                            <th>ID</th>
-                            <th>Source</th>
-                            <th>Lines</th>
-                            <th>Errors</th>
-                            <th>Critical</th>
-                            <th>Warnings</th>
-                            <th>Unique</th>
-                            <th>Created</th>
-                        </tr>
+        $("kbTotal")
+            .textContent =
+            kb.total || 0;
 
-                    </thead>
 
-                    <tbody>
+        $("kbBuiltIn")
+            .textContent =
+            kb.built_in || 0;
 
-                        ${
-                            data.history
-                                .map(
-                                    item => `
-                                    <tr>
 
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.id)
-                                            )}
-                                        </td>
+        $("kbLearned")
+            .textContent =
+            kb.learned || 0;
 
-                                        <td>
-                                            ${escapeHtml(
-                                                item.source_name
-                                            )}
-                                        </td>
 
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.total_lines)
-                                            )}
-                                        </td>
+        $("kbConfidence")
+            .textContent =
+            `${Math.round(
+                Number(
+                    kb.average_confidence ||
+                    0
+                ) * 100
+            )}%`;
 
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.total_errors)
-                                            )}
-                                        </td>
-
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.critical)
-                                            )}
-                                        </td>
-
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.warnings)
-                                            )}
-                                        </td>
-
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.unique_errors)
-                                            )}
-                                        </td>
-
-                                        <td>
-                                            ${escapeHtml(
-                                                item.created_at
-                                            )}
-                                        </td>
-
-                                    </tr>
-                                    `
-                                )
-                                .join("")
-                        }
-
-                    </tbody>
-
-                </table>
-
-            </div>
-        `;
-
-    } catch (error) {
-
-        container.innerHTML =
-            `<p>${escapeHtml(
-                error.message
-            )}</p>`;
     }
+
+    catch {
+
+    }
+
 }
 
 
-function escapeHtml(value) {
-
-    return String(
-        value ?? ""
-    )
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&#039;"
-        );
-}
-
+/* INITIAL LOAD */
 
 loadHistory();
+
 loadKnowledge();
