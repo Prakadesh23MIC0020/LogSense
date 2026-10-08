@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>LogScope</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
+
+</head>
+
+<body>
+
+<div class="page">
+
+    <header class="hero">
+
+        <div class="hero-icon">
+            ◆
+        </div>
+
+        <div>
+
+            <h1>LogScope</h1>
+
+            <p>
+                Intelligent log analysis,
+                error extraction and diagnosis.
+            </p>
+
+        </div>
+
+    </header>
+
+
+    <section class="specialization">
+
+        <div class="section-label">
+            AUTOMATIC SPECIALIZATION
+        </div>
+
+        <div class="specialization-title">
+            Minecraft · Java · Python ·
+            Spring Boot · SQL · Application Logs
+        </div>
+
+        <div class="muted">
+            LogScope automatically detects the
+            environment, component and error structure.
+        </div>
+
+    </section>
+
+
+    <section class="input-panel">
+
+        <div class="panel-header">
+
+            <div>
+
+                <h2>Analyze Log</h2>
+
+                <p>
+                    Upload a log or paste it below.
+                </p>
+
+            </div>
+
+            <label class="upload-button">
+
+                <span>Upload Log</span>
+
+                <input
+                    type="file"
+                    id="fileInput"
+                    accept=".log,.txt,.out,.err,.json,.csv"
+                >
+
+            </label>
+
+        </div>
+
+
+        <textarea
+            id="logInput"
+            placeholder="Paste Minecraft, Java, Python, Spring Boot, SQL or application logs here..."
+        ></textarea>
+
+
+        <div class="input-footer">
+
+            <span id="fileName">
+                No file selected
+            </span>
+
+            <button
+                id="analyzeButton"
+                class="primary-button"
+            >
+                Analyze Log
+            </button>
+
+        </div>
+
+    </section>
+
+
+    <div
+        id="loading"
+        class="loading hidden"
+    >
+        Analyzing log...
+    </div>
+
+
+    <section
+        id="results"
+        class="hidden"
+    >
+
+        <div class="environment-card">
+
+            <div class="section-label">
+                DETECTED ENVIRONMENT
+            </div>
+
+            <div
+                id="environment"
+                class="environment-title"
+            >
+            </div>
+
+        </div>
+
+
+        <div class="stats-grid">
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    TOTAL LINES
+                </div>
+
+                <div
+                    id="totalLines"
+                    class="stat-value"
+                >
+                    0
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    ERRORS
+                </div>
+
+                <div
+                    id="totalErrors"
+                    class="stat-value"
+                >
+                    0
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    CRITICAL
+                </div>
+
+                <div
+                    id="criticalErrors"
+                    class="stat-value"
+                >
+                    0
+                </div>
+
+            </div>
+
+
+            <div class="stat-card">
+
+                <div class="stat-label">
+                    UNIQUE
+                </div>
+
+                <div
+                    id="uniqueErrors"
+                    class="stat-value"
+                >
+                    0
+                </div>
+
+            </div>
+
+        </div>
+
+
+        <div class="toolbar">
+
+            <input
+                id="searchInput"
+                type="text"
+                placeholder="Search errors..."
+            >
+
+            <select id="severityFilter">
+
+                <option value="ALL">
+                    All Severities
+                </option>
+
+                <option value="Critical">
+                    Critical
+                </option>
+
+                <option value="Error">
+                    Error
+                </option>
+
+                <option value="Warning">
+                    Warning
+                </option>
+
+            </select>
+
+        </div>
+
+
+        <div id="errorList"></div>
+
+
+        <section class="overview">
+
+            <h2>Error Overview</h2>
+
+            <table>
+
+                <thead>
+
+                    <tr>
+                        <th>ID</th>
+                        <th>Type</th>
+                        <th>Severity</th>
+                        <th>Message</th>
+                        <th>File</th>
+                        <th>Line</th>
+                        <th>Occurrences</th>
+                    </tr>
+
+                </thead>
+
+                <tbody id="overviewBody"></tbody>
+
+            </table>
+
+        </section>
+
+
+        <section class="knowledge-panel">
+
+            <h2>Knowledge Base</h2>
+
+            <div class="knowledge-grid">
+
+                <div>
+                    <span>Total Rules</span>
+                    <strong id="kbTotal">0</strong>
+                </div>
+
+                <div>
+                    <span>Built-in</span>
+                    <strong id="kbBuiltin">0</strong>
+                </div>
+
+                <div>
+                    <span>AI Learned</span>
+                    <strong id="kbLearned">0</strong>
+                </div>
+
+                <div>
+                    <span>Confidence</span>
+                    <strong id="kbConfidence">0%</strong>
+                </div>
+
+            </div>
+
+        </section>
+
+    </section>
+
+
+    <section class="history-section">
+
+        <div class="panel-header">
+
+            <div>
+
+                <h2>Analysis History</h2>
+
+                <p>
+                    Stored in Neon PostgreSQL.
+                </p>
+
+            </div>
+
+            <button
+                id="historyButton"
+                class="secondary-button"
+            >
+                Refresh
+            </button>
+
+        </div>
+
+        <div id="historyTable"></div>
+
+    </section>
+
+</div>
+
+
+<script
+    src="{{ url_for('static', filename='app.js') }}"
+></script>
+
+</body>
+
+</html>
