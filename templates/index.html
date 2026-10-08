@@ -1,133 +1,449 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
     <title>LogScope</title>
 
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='style.css') }}"
+    >
 
-    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.plot.ly/plotly-2.35.2.min.js"></script>
 </head>
 
 <body>
 
-<main class="container">
+<div class="main">
 
-    <section class="hero">
-        <div class="hero-title">◆ LogScope</div>
+    <div class="block-container">
 
-        <div class="hero-subtitle">
-            Intelligent log analysis, error extraction and technical diagnosis.
-        </div>
-    </section>
+        <!-- HERO -->
 
+        <div class="hero">
 
-    <section class="specialization">
+            <div class="hero-title">
+                ◆ LogScope
+            </div>
 
-        <div class="stat-title">
-            AUTOMATIC SPECIALIZATION
-        </div>
-
-        <div class="specialization-title">
-            Minecraft · Java · Python · Spring Boot · SQL · Application Logs
-        </div>
-
-        <div class="muted">
-            LogScope automatically detects the environment, component and
-            error structure instead of requiring manual configuration.
-        </div>
-
-    </section>
-
-
-    <div class="tabs">
-
-        <button class="tab active" data-tab="analyze">
-            Analyze
-        </button>
-
-        <button class="tab" data-tab="results">
-            Results
-        </button>
-
-        <button class="tab" data-tab="history">
-            History
-        </button>
-
-    </div>
-
-
-    <!-- ANALYZE -->
-
-    <section id="analyze" class="tab-panel active">
-
-        <h2>Analyze Log</h2>
-
-        <div class="upload-box">
-
-            <label>
-                Upload a log file
-            </label>
-
-            <input
-                id="fileInput"
-                type="file"
-                accept=".log,.txt,.out,.err,.json,.csv"
-            >
-
-            <div id="fileName" class="muted">
-                No file selected
+            <div class="hero-subtitle">
+                Intelligent log analysis, error extraction and technical diagnosis.
             </div>
 
         </div>
 
 
-        <label for="logInput">
-            Or paste your log
-        </label>
+        <!-- AUTOMATIC SPECIALIZATION -->
 
-        <textarea
-            id="logInput"
-            placeholder="Paste Minecraft, Java, Python, Spring Boot, SQL or application logs here..."
-        ></textarea>
+        <div class="stat-card specialization-card">
 
+            <div class="stat-title">
+                AUTOMATIC SPECIALIZATION
+            </div>
 
-        <button
-            id="analyzeBtn"
-            class="primary-btn"
-        >
-            Analyze Log
-        </button>
+            <div class="specialization-text">
+                Minecraft · Java · Python · Spring Boot · SQL · Application Logs
+            </div>
 
+            <div class="muted">
+                LogScope automatically detects the environment,
+                component and error structure instead of requiring
+                manual configuration.
+            </div>
 
-        <div id="analyzeStatus"></div>
-
-    </section>
-
-
-    <!-- RESULTS -->
-
-    <section id="results" class="tab-panel">
-
-        <div
-            id="emptyResults"
-            class="info-box"
-        >
-            No analysis available. Analyze a log first.
         </div>
 
 
-        <div
-            id="resultsContent"
-            class="hidden"
+        <div class="spacer"></div>
+
+
+        <!-- TABS -->
+
+        <div class="tabs">
+
+            <button
+                class="tab active"
+                data-tab="analyze"
+            >
+                Analyze
+            </button>
+
+            <button
+                class="tab"
+                data-tab="results"
+            >
+                Results
+            </button>
+
+            <button
+                class="tab"
+                data-tab="history"
+            >
+                History
+            </button>
+
+        </div>
+
+
+        <!-- ================================================= -->
+        <!-- ANALYZE -->
+        <!-- ================================================= -->
+
+        <section
+            id="analyze"
+            class="tab-page active"
+        >
+
+            <h2>
+                Analyze Log
+            </h2>
+
+
+            <div class="file-section">
+
+                <label>
+                    Upload a log file
+                </label>
+
+                <input
+                    id="fileInput"
+                    type="file"
+                    accept=".log,.txt,.out,.err,.json,.csv"
+                >
+
+                <div
+                    id="fileName"
+                    class="muted"
+                >
+                    No file selected
+                </div>
+
+            </div>
+
+
+            <label>
+                Or paste your log
+            </label>
+
+
+            <textarea
+                id="logInput"
+                class="log-input"
+                placeholder="Paste Minecraft, Java, Python, Spring Boot, SQL or application logs here..."
+            ></textarea>
+
+
+            <button
+                id="analyzeButton"
+                class="analyze-button"
+            >
+                Analyze Log
+            </button>
+
+
+            <div
+                id="analyzeMessage"
+                class="message-area"
+            ></div>
+
+        </section>
+
+
+        <!-- ================================================= -->
+        <!-- RESULTS -->
+        <!-- ================================================= -->
+
+        <section
+            id="results"
+            class="tab-page"
         >
 
             <div
-                id="environmentCard"
-                class="environment-card"
-            ></div>
+                id="noResults"
+                class="info-box"
+            >
+                No analysis available.
+                Analyze a log first.
+            </div>
+
+
+            <div
+                id="resultsContainer"
+                class="hidden"
+            >
+
+                <!-- ENVIRONMENT -->
+
+                <div class="stat-card environment-card">
+
+                    <div class="stat-title">
+                        DETECTED ENVIRONMENT
+                    </div>
+
+                    <div
+                        id="environment"
+                        class="environment-value"
+                    >
+                    </div>
+
+                </div>
+
+
+                <div class="spacer"></div>
+
+
+                <!-- STATS -->
+
+                <div class="stats-grid">
+
+                    <div class="stat-card">
+
+                        <div class="stat-title">
+                            TOTAL LINES
+                        </div>
+
+                        <div
+                            id="totalLines"
+                            class="stat-value"
+                        >
+                            0
+                        </div>
+
+                    </div>
+
+
+                    <div class="stat-card">
+
+                        <div class="stat-title">
+                            ERRORS
+                        </div>
+
+                        <div
+                            id="totalErrors"
+                            class="stat-value"
+                        >
+                            0
+                        </div>
+
+                    </div>
+
+
+                    <div class="stat-card">
+
+                        <div class="stat-title">
+                            CRITICAL
+                        </div>
+
+                        <div
+                            id="criticalErrors"
+                            class="stat-value"
+                        >
+                            0
+                        </div>
+
+                    </div>
+
+
+                    <div class="stat-card">
+
+                        <div class="stat-title">
+                            UNIQUE
+                        </div>
+
+                        <div
+                            id="uniqueErrors"
+                            class="stat-value"
+                        >
+                            0
+                        </div>
+
+                    </div>
+
+                </div>
+
+
+                <div class="spacer"></div>
+
+
+                <!-- FILTERS -->
+
+                <div class="filters">
+
+                    <input
+                        id="searchInput"
+                        type="text"
+                        placeholder="Search error type, message or file..."
+                    >
+
+
+                    <select
+                        id="severityFilter"
+                        multiple
+                    >
+
+                        <option
+                            value="Critical"
+                            selected
+                        >
+                            Critical
+                        </option>
+
+                        <option
+                            value="Error"
+                            selected
+                        >
+                            Error
+                        </option>
+
+                        <option
+                            value="Warning"
+                            selected
+                        >
+                            Warning
+                        </option>
+
+                    </select>
+
+                </div>
+
+
+                <!-- ERROR CARDS -->
+
+                <div id="errorCards"></div>
+
+
+                <div class="divider"></div>
+
+
+                <!-- ERROR OVERVIEW -->
+
+                <h2>
+                    Error Overview
+                </h2>
+
+
+                <div class="table-container">
+
+                    <table>
+
+                        <thead>
+
+                            <tr>
+
+                                <th>
+                                    Type
+                                </th>
+
+                                <th>
+                                    Severity
+                                </th>
+
+                                <th>
+                                    File
+                                </th>
+
+                                <th>
+                                    Line
+                                </th>
+
+                                <th>
+                                    Occurrences
+                                </th>
+
+                            </tr>
+
+                        </thead>
+
+
+                        <tbody id="errorTable">
+
+                        </tbody>
+
+                    </table>
+
+                </div>
+
+
+                <div class="divider"></div>
+
+
+                <!-- CHARTS -->
+
+                <div class="charts-grid">
+
+                    <div
+                        id="severityChart"
+                        class="chart"
+                    ></div>
+
+
+                    <div
+                        id="typeChart"
+                        class="chart"
+                    ></div>
+
+                </div>
+
+
+                <!-- EXPORT -->
+
+                <h2>
+                    Export
+                </h2>
+
+
+                <div class="export-grid">
+
+                    <button
+                        id="downloadCsv"
+                        class="download-button"
+                    >
+                        Download CSV
+                    </button>
+
+
+                    <button
+                        id="downloadJson"
+                        class="download-button"
+                    >
+                        Download JSON
+                    </button>
+
+                </div>
+
+            </div>
+
+        </section>
+
+
+        <!-- ================================================= -->
+        <!-- HISTORY -->
+        <!-- ================================================= -->
+
+        <section
+            id="history"
+            class="tab-page"
+        >
+
+            <h2>
+                Analysis History
+            </h2>
+
+
+            <div
+                id="historyArea"
+                class="info-box"
+            >
+                Loading history...
+            </div>
+
+
+            <h2>
+                Knowledge Base
+            </h2>
 
 
             <div class="stats-grid">
@@ -135,11 +451,11 @@
                 <div class="stat-card">
 
                     <div class="stat-title">
-                        TOTAL LINES
+                        TOTAL RULES
                     </div>
 
                     <div
-                        id="totalLines"
+                        id="knowledgeTotal"
                         class="stat-value"
                     >
                         0
@@ -151,11 +467,11 @@
                 <div class="stat-card">
 
                     <div class="stat-title">
-                        ERRORS
+                        BUILT-IN
                     </div>
 
                     <div
-                        id="totalErrors"
+                        id="knowledgeBuiltIn"
                         class="stat-value"
                     >
                         0
@@ -167,11 +483,11 @@
                 <div class="stat-card">
 
                     <div class="stat-title">
-                        CRITICAL
+                        AI LEARNED
                     </div>
 
                     <div
-                        id="criticalErrors"
+                        id="knowledgeLearned"
                         class="stat-value"
                     >
                         0
@@ -183,258 +499,30 @@
                 <div class="stat-card">
 
                     <div class="stat-title">
-                        UNIQUE
+                        AVG CONFIDENCE
                     </div>
 
                     <div
-                        id="uniqueErrors"
+                        id="knowledgeConfidence"
                         class="stat-value"
                     >
-                        0
+                        0%
                     </div>
 
                 </div>
 
             </div>
 
+        </section>
 
-            <div class="filters">
+    </div>
 
-                <input
-                    id="searchInput"
-                    type="text"
-                    placeholder="Search error type, message or file..."
-                >
+</div>
 
 
-                <select
-                    id="severityFilter"
-                    multiple
-                >
-
-                    <option
-                        value="Critical"
-                        selected
-                    >
-                        Critical
-                    </option>
-
-                    <option
-                        value="Error"
-                        selected
-                    >
-                        Error
-                    </option>
-
-                    <option
-                        value="Warning"
-                        selected
-                    >
-                        Warning
-                    </option>
-
-                </select>
-
-            </div>
-
-
-            <div id="errorCards"></div>
-
-
-            <h2>
-                Error Overview
-            </h2>
-
-
-            <div class="table-wrap">
-
-                <table>
-
-                    <thead>
-
-                        <tr>
-
-                            <th>
-                                Type
-                            </th>
-
-                            <th>
-                                Severity
-                            </th>
-
-                            <th>
-                                File
-                            </th>
-
-                            <th>
-                                Line
-                            </th>
-
-                            <th>
-                                Occurrences
-                            </th>
-
-                        </tr>
-
-                    </thead>
-
-
-                    <tbody id="errorTable"></tbody>
-
-                </table>
-
-            </div>
-
-
-            <div class="charts-grid">
-
-                <div class="chart-card">
-
-                    <canvas
-                        id="severityChart"
-                    ></canvas>
-
-                </div>
-
-
-                <div class="chart-card">
-
-                    <canvas
-                        id="typeChart"
-                    ></canvas>
-
-                </div>
-
-            </div>
-
-
-            <h2>
-                Export
-            </h2>
-
-
-            <div class="export-grid">
-
-                <button
-                    id="csvBtn"
-                    class="secondary-btn"
-                >
-                    Download CSV
-                </button>
-
-
-                <button
-                    id="jsonBtn"
-                    class="secondary-btn"
-                >
-                    Download JSON
-                </button>
-
-            </div>
-
-        </div>
-
-    </section>
-
-
-    <!-- HISTORY -->
-
-    <section
-        id="history"
-        class="tab-panel"
-    >
-
-        <h2>
-            Analysis History
-        </h2>
-
-
-        <div
-            id="historyContent"
-            class="info-box"
-        >
-            Loading history...
-        </div>
-
-
-        <h2>
-            Knowledge Base
-        </h2>
-
-
-        <div class="stats-grid">
-
-            <div class="stat-card">
-
-                <div class="stat-title">
-                    TOTAL RULES
-                </div>
-
-                <div
-                    id="kbTotal"
-                    class="stat-value"
-                >
-                    0
-                </div>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <div class="stat-title">
-                    BUILT-IN
-                </div>
-
-                <div
-                    id="kbBuiltIn"
-                    class="stat-value"
-                >
-                    0
-                </div>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <div class="stat-title">
-                    AI LEARNED
-                </div>
-
-                <div
-                    id="kbLearned"
-                    class="stat-value"
-                >
-                    0
-                </div>
-
-            </div>
-
-
-            <div class="stat-card">
-
-                <div class="stat-title">
-                    AVG CONFIDENCE
-                </div>
-
-                <div
-                    id="kbConfidence"
-                    class="stat-value"
-                >
-                    0%
-                </div>
-
-            </div>
-
-        </div>
-
-    </section>
-
-</main>
-
-
-<script src="{{ url_for('static', filename='app.js') }}"></script>
+<script
+    src="{{ url_for('static', filename='app.js') }}"
+></script>
 
 </body>
 </html>
