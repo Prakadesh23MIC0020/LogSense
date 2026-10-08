@@ -1,104 +1,178 @@
-let allErrors = [];
+let errors = [];
+
+let stats = {};
+
+let environments = [];
+
+let severityPlot = null;
+
+let typePlot = null;
 
 
-const logInput =
-    document.getElementById("logInput");
+const $ = id =>
+    document.getElementById(id);
 
-const fileInput =
-    document.getElementById("fileInput");
 
-const fileName =
-    document.getElementById("fileName");
+/* ================================================= */
+/* TABS */
+/* ================================================= */
 
-const analyzeButton =
-    document.getElementById("analyzeButton");
+document
+    .querySelectorAll(".tab")
+    .forEach(button => {
 
-const loading =
-    document.getElementById("loading");
+        button.addEventListener(
+            "click",
+            () => {
 
-const results =
-    document.getElementById("results");
+                const name =
+                    button.dataset.tab;
 
-const errorList =
-    document.getElementById("errorList");
 
-const overviewBody =
-    document.getElementById("overviewBody");
+                document
+                    .querySelectorAll(".tab")
+                    .forEach(tab => {
 
-const searchInput =
-    document.getElementById("searchInput");
+                        tab.classList.toggle(
+                            "active",
+                            tab.dataset.tab === name
+                        );
 
-const severityFilter =
-    document.getElementById(
-        "severityFilter"
+                    });
+
+
+                document
+                    .querySelectorAll(".tab-page")
+                    .forEach(page => {
+
+                        page.classList.toggle(
+                            "active",
+                            page.id === name
+                        );
+
+                    });
+
+
+                if (name === "history") {
+
+                    loadHistory();
+
+                    loadKnowledge();
+
+                }
+
+            }
+        );
+
+    });
+
+
+/* ================================================= */
+/* ESCAPE */
+/* ================================================= */
+
+function escapeHtml(value) {
+
+    return String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+
+}
+
+
+/* ================================================= */
+/* FILE UPLOAD */
+/* ================================================= */
+
+$("fileInput")
+    .addEventListener(
+        "change",
+        async event => {
+
+            const file =
+                event.target.files[0];
+
+
+            if (!file) {
+
+                return;
+
+            }
+
+
+            $("fileName")
+                .textContent =
+                file.name;
+
+
+            try {
+
+                $("logInput").value =
+                    await file.text();
+
+            }
+
+            catch (error) {
+
+                $("fileName")
+                    .textContent =
+                    "Could not read file";
+
+            }
+
+        }
     );
 
 
-fileInput.addEventListener(
-    "change",
-    async function () {
+/* ================================================= */
+/* ANALYZE */
+/* ================================================= */
 
-        const file =
-            fileInput.files[0];
-
-        if (!file) {
-            return;
-        }
-
-        fileName.textContent =
-            file.name;
-
-        const text =
-            await file.text();
-
-        logInput.value =
-            text;
-    }
-);
-
-
-analyzeButton.addEventListener(
-    "click",
-    analyzeLog
-);
-
-
-searchInput.addEventListener(
-    "input",
-    renderErrors
-);
-
-
-severityFilter.addEventListener(
-    "change",
-    renderErrors
-);
+$("analyzeButton")
+    .addEventListener(
+        "click",
+        analyzeLog
+    );
 
 
 async function analyzeLog() {
 
     const text =
-        logInput.value.trim();
+        $("logInput")
+            .value
+            .trim();
+
 
     if (!text) {
 
-        alert(
-            "Please upload or paste a log."
+        showMessage(
+            "Please upload or paste a log.",
+            true
         );
 
         return;
+
     }
 
-    loading.classList.remove(
-        "hidden"
-    );
 
-    results.classList.add(
-        "hidden"
-    );
-
-    analyzeButton.disabled =
+    $("analyzeButton")
+        .disabled =
         true;
+
+
+    $("analyzeButton")
+        .textContent =
+        "Analyzing...";
+
+
+    showMessage(
+        "Analyzing log...",
+        false
+    );
+
 
     try {
 
@@ -106,6 +180,7 @@ async function analyzeLog() {
             await fetch(
                 "/api/analyze",
                 {
+
                     method: "POST",
 
                     headers: {
@@ -113,335 +188,536 @@ async function analyzeLog() {
                             "application/json"
                     },
 
-                    body: JSON.stringify({
-                        text: text,
-                        source_name:
-                            fileInput.files[0]
-                                ? fileInput.files[0].name
-                                : "Pasted Log"
-                    })
+                    body:
+                        JSON.stringify({
+
+                            text: text,
+
+                            source_name:
+                                $("fileInput")
+                                    .files[0]
+                                    ?.name
+                                ||
+                                "Pasted Log"
+
+                        })
+
                 }
             );
 
+
         const data =
             await response.json();
+
 
         if (!response.ok) {
 
             throw new Error(
                 data.error ||
-                "Analysis failed."
+                "Analysis failed"
             );
+
         }
 
-        allErrors =
+
+        errors =
             data.errors || [];
 
-        document.getElementById(
-            "environment"
-        ).textContent =
-            (
-                data.environment || []
-            ).join(" · ");
 
-        document.getElementById(
-            "totalLines"
-        ).textContent =
-            data.stats.total_lines;
+        stats =
+            data.stats || {};
 
-        document.getElementById(
-            "totalErrors"
-        ).textContent =
-            data.stats.total_errors;
 
-        document.getElementById(
-            "criticalErrors"
-        ).textContent =
-            data.stats.critical;
+        environments =
+            data.environments ||
+            ["General"];
 
-        document.getElementById(
-            "uniqueErrors"
-        ).textContent =
-            data.stats.unique_errors;
 
-        results.classList.remove(
-            "hidden"
+        renderResults();
+
+
+        showMessage(
+            "Analysis completed. Open the Results tab to view the diagnosis.",
+            false
         );
 
-        renderErrors();
 
-        await loadKnowledge();
+        document
+            .querySelector(
+                '[data-tab="results"]'
+            )
+            .click();
 
-        window.scrollTo({
-            top: results.offsetTop - 20,
-            behavior: "smooth"
-        });
 
-    } catch (error) {
+        loadKnowledge();
 
-        alert(
-            error.message
-        );
-
-    } finally {
-
-        loading.classList.add(
-            "hidden"
-        );
-
-        analyzeButton.disabled =
-            false;
     }
+
+    catch (error) {
+
+        showMessage(
+            error.message,
+            true
+        );
+
+    }
+
+    finally {
+
+        $("analyzeButton")
+            .disabled =
+            false;
+
+
+        $("analyzeButton")
+            .textContent =
+            "Analyze Log";
+
+    }
+
 }
 
 
-function renderErrors() {
+function showMessage(
+    message,
+    error
+) {
 
-    const search =
-        searchInput.value
-            .trim()
-            .toLowerCase();
+    $("analyzeMessage")
+        .innerHTML =
+        `
+        <div class="message ${error ? "error" : ""}">
+            ${escapeHtml(message)}
+        </div>
+        `;
+
+}
+
+
+/* ================================================= */
+/* RESULTS */
+/* ================================================= */
+
+function renderResults() {
+
+    $("noResults")
+        .classList
+        .add("hidden");
+
+
+    $("resultsContainer")
+        .classList
+        .remove("hidden");
+
+
+    $("environment")
+        .textContent =
+        environments.join(" · ");
+
+
+    $("totalLines")
+        .textContent =
+        stats.total_lines || 0;
+
+
+    $("totalErrors")
+        .textContent =
+        stats.total_errors || 0;
+
+
+    $("criticalErrors")
+        .textContent =
+        stats.critical || 0;
+
+
+    $("uniqueErrors")
+        .textContent =
+        stats.unique_errors || 0;
+
+
+    renderErrorCards();
+
+    renderErrorTable();
+
+    renderCharts();
+
+}
+
+
+/* ================================================= */
+/* FILTER */
+/* ================================================= */
+
+$("searchInput")
+    .addEventListener(
+        "input",
+        () => {
+
+            renderErrorCards();
+
+            renderErrorTable();
+
+        }
+    );
+
+
+$("severityFilter")
+    .addEventListener(
+        "change",
+        () => {
+
+            renderErrorCards();
+
+            renderErrorTable();
+
+        }
+    );
+
+
+function selectedSeverities() {
+
+    return Array
+        .from(
+            $("severityFilter")
+                .selectedOptions
+        )
+        .map(
+            option =>
+                option.value
+        );
+
+}
+
+
+function filteredErrors() {
+
+    const query =
+        $("searchInput")
+            .value
+            .toLowerCase()
+            .trim();
+
 
     const severity =
-        severityFilter.value;
+        selectedSeverities();
 
-    const filtered =
-        allErrors.filter(
-            error => {
 
-                if (
-                    severity !== "ALL"
-                    &&
-                    error.severity !== severity
-                ) {
-                    return false;
-                }
+    return errors.filter(
+        error => {
 
-                if (!search) {
-                    return true;
-                }
-
-                const text = [
-                    error.type,
-                    error.message,
-                    error.file,
+            if (
+                !severity.includes(
                     error.severity
+                )
+            ) {
+
+                return false;
+
+            }
+
+
+            if (!query) {
+
+                return true;
+
+            }
+
+
+            const text =
+                [
+
+                    error.type,
+
+                    error.message,
+
+                    error.file
+
                 ]
                     .join(" ")
                     .toLowerCase();
 
-                return text.includes(
-                    search
-                );
-            }
-        );
 
-    errorList.innerHTML = "";
-
-    overviewBody.innerHTML = "";
-
-    filtered.forEach(
-        error => {
-
-            renderErrorCard(
-                error
+            return text.includes(
+                query
             );
 
-            renderOverviewRow(
-                error
-            );
         }
     );
+
 }
 
 
-function renderErrorCard(error) {
+/* ================================================= */
+/* ERROR CARDS */
+/* ================================================= */
 
-    const explanation =
-        error.explanation || {};
+function renderErrorCards() {
 
-    const card =
-        document.createElement(
-            "article"
-        );
+    const filtered =
+        filteredErrors();
 
-    card.className =
-        "error-card";
 
-    const severityClass =
-        error.severity === "Critical"
-            ? "badge-critical"
-            : error.severity === "Warning"
-                ? "badge-warning"
-                : "badge-error";
+    if (!filtered.length) {
 
-    let sourcesHtml = "";
-
-    if (
-        explanation.source ===
-            "AI Research"
-        &&
-        explanation.confidence >= 0.70
-        &&
-        explanation.source_links
-        &&
-        explanation.source_links.length
-    ) {
-
-        sourcesHtml =
+        $("errorCards")
+            .innerHTML =
             `
-            <h4>RELATED RESOURCES</h4>
-            <div class="source-list">
-                ${
-                    explanation.source_links
-                        .map(
-                            source => `
-                            <div>
-                                <a
-                                    href="${escapeHtml(source.url)}"
-                                    target="_blank"
-                                    rel="noopener"
-                                >
-                                    ${escapeHtml(source.title)}
-                                </a>
-                            </div>
-                            `
-                        )
-                        .join("")
-                }
+            <div class="info-box">
+                No errors match the current filters.
             </div>
             `;
+
+        return;
+
     }
 
+
+    $("errorCards")
+        .innerHTML =
+        filtered
+            .map(
+                createErrorCard
+            )
+            .join("");
+
+}
+
+
+function createErrorCard(error) {
+
+    const explanation =
+        error.explanation ||
+        {};
+
+
+    const severity =
+        error.severity ||
+        "Error";
+
+
+    const errorType =
+        error.type ||
+        "Unknown Error";
+
+
+    const file =
+        error.file ||
+        "Unknown";
+
+
+    const line =
+        error.line ||
+        "-";
+
+
+    const category =
+        explanation.category ||
+        environments[0] ||
+        "General";
+
+
+    const component =
+        explanation.component ||
+        "General";
+
+
+    const confidence =
+        Number(
+            explanation.confidence ||
+            0
+        );
+
+
+    const source =
+        explanation.source ||
+        "Unknown";
+
+
     let codeHtml = "";
+
 
     if (explanation.code) {
 
         codeHtml =
             `
-            <h4>SUGGESTED CHANGE</h4>
-            <pre>${escapeHtml(
+            <div class="section-title">
+                ▣ Suggested change
+            </div>
+
+            <pre class="code-block">${escapeHtml(
                 explanation.code
             )}</pre>
             `;
+
     }
 
-    card.innerHTML = `
-        <div class="error-heading">
 
-            <div>
+    let resourcesHtml = "";
 
-                <div class="error-type">
-                    ◆ ${escapeHtml(
-                        error.type
+
+    const resources =
+        explanation.source_links ||
+        [];
+
+
+    if (
+        resources.length > 0 &&
+        source === "AI Research" &&
+        confidence >= 0.70
+    ) {
+
+        resourcesHtml =
+            `
+            <div class="section-title">
+                ◈ Related resources
+            </div>
+
+            ${
+                resources
+                    .map(
+                        item =>
+                            `
+                            <div class="resource">
+
+                                <a
+                                    href="${escapeHtml(
+                                        item.url || "#"
+                                    )}"
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                >
+                                    ${escapeHtml(
+                                        item.title ||
+                                        "Source"
+                                    )}
+                                </a>
+
+                            </div>
+                            `
+                    )
+                    .join("")
+            }
+            `;
+
+    }
+
+
+    return `
+        <div class="error-card">
+
+            <div class="error-title">
+                ◆ ${escapeHtml(
+                    errorType
+                )}
+            </div>
+
+
+            <div class="badges">
+
+                <span class="badge">
+                    ${escapeHtml(
+                        severity.toUpperCase()
+                    )}
+                </span>
+
+                <span class="badge">
+                    ${escapeHtml(category)}
+                </span>
+
+                <span class="badge">
+                    ${escapeHtml(component)}
+                </span>
+
+            </div>
+
+
+            <div class="error-meta">
+
+                <div class="meta-title">
+                    LOCATION
+                </div>
+
+                <div>
+                    ${escapeHtml(file)}:${escapeHtml(line)}
+                </div>
+
+
+                <div class="meta-title">
+                    OCCURRENCES
+                </div>
+
+                <div>
+                    ${escapeHtml(
+                        error.occurrences ||
+                        1
                     )}
                 </div>
 
-                <div class="badges">
 
-                    <span class="badge ${severityClass}">
-                        ${escapeHtml(
-                            error.severity.toUpperCase()
-                        )}
-                    </span>
+                <div class="meta-title">
+                    KNOWLEDGE SOURCE
+                </div>
 
-                    <span class="badge">
-                        ${escapeHtml(
-                            explanation.category ||
-                            "General"
-                        )}
-                    </span>
-
-                    <span class="badge">
-                        ${escapeHtml(
-                            explanation.component ||
-                            "General"
-                        )}
-                    </span>
-
+                <div>
+                    ${escapeHtml(source)}
+                    · Confidence
+                    ${Math.round(
+                        confidence * 100
+                    )}%
                 </div>
 
             </div>
 
-        </div>
 
-        <div class="error-meta">
+            <div class="section-title">
+                ⌁ What happened
+            </div>
 
-            LOCATION:
-            ${escapeHtml(
-                error.file || "Unknown"
-            )}:${escapeHtml(
-                String(
-                    error.line || "-"
-                )
-            )}
-
-            <br><br>
-
-            OCCURRENCES:
-            ${escapeHtml(
-                String(
-                    error.occurrences || 1
-                )
-            )}
-
-            <br><br>
-
-            KNOWLEDGE SOURCE:
-            ${escapeHtml(
-                explanation.source ||
-                "Unknown"
-            )}
-            · Confidence
-            ${Math.round(
-                (
-                    explanation.confidence ||
-                    0
-                ) * 100
-            )}%
-
-        </div>
-
-        <div class="diagnosis">
-
-            <h4>⌁ WHAT HAPPENED</h4>
-
-            <p>
+            <div>
                 ${escapeHtml(
                     explanation.description ||
                     "No explanation available."
                 )}
-            </p>
+            </div>
 
-            <h4>⌁ LIKELY CAUSE</h4>
 
-            <p>
+            <div class="section-title">
+                ⌁ Likely cause
+            </div>
+
+            <div>
                 ${escapeHtml(
                     explanation.cause ||
                     "No sufficiently reliable cause was identified."
                 )}
-            </p>
+            </div>
 
-            <h4>▣ FIX</h4>
 
-            <p>
+            <div class="section-title">
+                ▣ Fix
+            </div>
+
+            <div>
                 ${escapeHtml(
                     explanation.fix ||
-                    "Review the stack trace and affected component."
+                    "Review the stack trace and investigate the affected component."
                 )}
-            </p>
+            </div>
+
 
             ${codeHtml}
 
-            ${sourcesHtml}
 
-            <details class="raw-log">
+            ${resourcesHtml}
+
+
+            <details>
 
                 <summary>
                     View raw log
                 </summary>
 
-                <pre>${escapeHtml(
+                <pre class="raw-log">${escapeHtml(
                     error.raw || ""
                 )}</pre>
 
@@ -450,72 +726,561 @@ function renderErrorCard(error) {
         </div>
     `;
 
-    errorList.appendChild(
-        card
-    );
 }
 
 
-function renderOverviewRow(error) {
+/* ================================================= */
+/* TABLE */
+/* ================================================= */
 
-    const row =
-        document.createElement(
-            "tr"
+function renderErrorTable() {
+
+    const filtered =
+        filteredErrors();
+
+
+    $("errorTable")
+        .innerHTML =
+        filtered
+            .map(
+                error =>
+                    `
+                    <tr>
+
+                        <td>
+                            ${escapeHtml(
+                                error.type ||
+                                "Unknown Error"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                error.severity ||
+                                "Error"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                error.file ||
+                                "Unknown"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                error.line ||
+                                "-"
+                            )}
+                        </td>
+
+                        <td>
+                            ${escapeHtml(
+                                error.occurrences ||
+                                1
+                            )}
+                        </td>
+
+                    </tr>
+                    `
+            )
+            .join("");
+
+}
+
+
+/* ================================================= */
+/* PLOTLY CHARTS */
+/* ================================================= */
+
+function renderCharts() {
+
+    const severity =
+        stats.severity ||
+        {};
+
+
+    const types =
+        stats.types ||
+        {};
+
+
+    const layout = {
+
+        paper_bgcolor:
+            "rgba(0,0,0,0)",
+
+        plot_bgcolor:
+            "rgba(0,0,0,0)",
+
+        font: {
+            color: "#ddd"
+        },
+
+        margin: {
+            l: 55,
+            r: 20,
+            t: 55,
+            b: 55
+        },
+
+        title: {
+            font: {
+                size: 16
+            }
+        },
+
+        xaxis: {
+            gridcolor:
+                "rgba(255,255,255,.05)"
+        },
+
+        yaxis: {
+            gridcolor:
+                "rgba(255,255,255,.05)"
+        }
+
+    };
+
+
+    Plotly.newPlot(
+
+        "severityChart",
+
+        [
+
+            {
+
+                x:
+                    Object.keys(
+                        severity
+                    ),
+
+                y:
+                    Object.values(
+                        severity
+                    ),
+
+                type: "bar",
+
+                name: "Count"
+
+            }
+
+        ],
+
+        {
+
+            ...layout,
+
+            title:
+                "Severity Distribution"
+
+        },
+
+        {
+
+            displayModeBar:
+                false,
+
+            responsive: true
+
+        }
+
+    );
+
+
+    Plotly.newPlot(
+
+        "typeChart",
+
+        [
+
+            {
+
+                x:
+                    Object.keys(
+                        types
+                    ),
+
+                y:
+                    Object.values(
+                        types
+                    ),
+
+                type: "bar",
+
+                name: "Count"
+
+            }
+
+        ],
+
+        {
+
+            ...layout,
+
+            title:
+                "Error Types"
+
+        },
+
+        {
+
+            displayModeBar:
+                false,
+
+            responsive: true
+
+        }
+
+    );
+
+}
+
+
+/* ================================================= */
+/* EXPORT CSV */
+/* ================================================= */
+
+$("downloadCsv")
+    .addEventListener(
+        "click",
+        () => {
+
+            const rows = [
+
+                [
+                    "Type",
+                    "Severity",
+                    "Message",
+                    "File",
+                    "Line",
+                    "Occurrences"
+                ]
+
+            ];
+
+
+            errors.forEach(
+                error => {
+
+                    rows.push(
+
+                        [
+
+                            error.type || "",
+
+                            error.severity || "",
+
+                            error.message || "",
+
+                            error.file || "",
+
+                            error.line || "",
+
+                            error.occurrences || 1
+
+                        ]
+
+                    );
+
+                }
+            );
+
+
+            const csv =
+                rows
+                    .map(
+                        row =>
+                            row
+                                .map(
+                                    value =>
+                                        `"${String(
+                                            value
+                                        ).replaceAll(
+                                            '"',
+                                            '""'
+                                        )}"`
+                                )
+                                .join(",")
+                    )
+                    .join("\n");
+
+
+            download(
+                "logscope_results.csv",
+                csv,
+                "text/csv"
+            );
+
+        }
+    );
+
+
+/* ================================================= */
+/* EXPORT JSON */
+/* ================================================= */
+
+$("downloadJson")
+    .addEventListener(
+        "click",
+        () => {
+
+            download(
+
+                "logscope_results.json",
+
+                JSON.stringify(
+                    errors,
+                    null,
+                    2
+                ),
+
+                "application/json"
+
+            );
+
+        }
+    );
+
+
+function download(
+    filename,
+    content,
+    type
+) {
+
+    const blob =
+        new Blob(
+            [content],
+            {
+                type: type
+            }
         );
 
-    row.innerHTML = `
-        <td>
-            ${escapeHtml(
-                String(error.id)
-            )}
-        </td>
 
-        <td>
-            ${escapeHtml(
-                error.type
-            )}
-        </td>
+    const url =
+        URL.createObjectURL(
+            blob
+        );
 
-        <td>
-            ${escapeHtml(
-                error.severity
-            )}
-        </td>
 
-        <td>
-            ${escapeHtml(
-                error.message
-            )}
-        </td>
+    const link =
+        document.createElement(
+            "a"
+        );
 
-        <td>
-            ${escapeHtml(
-                error.file || "-"
-            )}
-        </td>
 
-        <td>
-            ${escapeHtml(
-                String(
-                    error.line || "-"
-                )
-            )}
-        </td>
+    link.href = url;
 
-        <td>
-            ${escapeHtml(
-                String(
-                    error.occurrences || 1
-                )
-            )}
-        </td>
-    `;
+    link.download =
+        filename;
 
-    overviewBody.appendChild(
-        row
+
+    document
+        .body
+        .appendChild(link);
+
+
+    link.click();
+
+
+    link.remove();
+
+
+    URL.revokeObjectURL(
+        url
     );
+
 }
 
+
+/* ================================================= */
+/* HISTORY */
+/* ================================================= */
+
+async function loadHistory() {
+
+    try {
+
+        const response =
+            await fetch(
+                "/api/history"
+            );
+
+
+        const data =
+            await response.json();
+
+
+        if (!response.ok) {
+
+            throw new Error(
+                data.error ||
+                "Could not load history"
+            );
+
+        }
+
+
+        const history =
+            data.history ||
+            [];
+
+
+        if (!history.length) {
+
+            $("historyArea")
+                .innerHTML =
+                "No previous analyses found.";
+
+            return;
+
+        }
+
+
+        $("historyArea")
+            .innerHTML =
+            `
+            <div class="table-container">
+
+                <table>
+
+                    <thead>
+
+                        <tr>
+
+                            <th>
+                                ID
+                            </th>
+
+                            <th>
+                                Source
+                            </th>
+
+                            <th>
+                                Lines
+                            </th>
+
+                            <th>
+                                Errors
+                            </th>
+
+                            <th>
+                                Critical
+                            </th>
+
+                            <th>
+                                Warnings
+                            </th>
+
+                            <th>
+                                Unique
+                            </th>
+
+                            <th>
+                                Created
+                            </th>
+
+                        </tr>
+
+                    </thead>
+
+
+                    <tbody>
+
+                        ${
+                            history
+                                .map(
+                                    item =>
+                                        `
+                                        <tr>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.id
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.source_name
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.total_lines
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.total_errors
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.critical
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.warnings
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.unique_errors
+                                                )}
+                                            </td>
+
+                                            <td>
+                                                ${escapeHtml(
+                                                    item.created_at
+                                                )}
+                                            </td>
+
+                                        </tr>
+                                        `
+                                )
+                                .join("")
+                        }
+
+                    </tbody>
+
+                </table>
+
+            </div>
+            `;
+
+    }
+
+    catch (error) {
+
+        $("historyArea")
+            .innerHTML =
+            `
+            <div class="message error">
+                ${escapeHtml(
+                    error.message
+                )}
+            </div>
+            `;
+
+    }
+
+}
+
+
+/* ================================================= */
+/* KNOWLEDGE BASE */
+/* ================================================= */
 
 async function loadKnowledge() {
 
@@ -526,208 +1291,60 @@ async function loadKnowledge() {
                 "/api/knowledge"
             );
 
-        const data =
-            await response.json();
-
-        document.getElementById(
-            "kbTotal"
-        ).textContent =
-            data.total || 0;
-
-        document.getElementById(
-            "kbBuiltin"
-        ).textContent =
-            data.built_in || 0;
-
-        document.getElementById(
-            "kbLearned"
-        ).textContent =
-            data.learned || 0;
-
-        document.getElementById(
-            "kbConfidence"
-        ).textContent =
-            Math.round(
-                (
-                    data.average_confidence ||
-                    0
-                ) * 100
-            ) + "%";
-
-    } catch (error) {
-
-        console.error(
-            error
-        );
-    }
-}
-
-
-document.getElementById(
-    "historyButton"
-).addEventListener(
-    "click",
-    loadHistory
-);
-
-
-async function loadHistory() {
-
-    const container =
-        document.getElementById(
-            "historyTable"
-        );
-
-    container.innerHTML =
-        "Loading...";
-
-    try {
-
-        const response =
-            await fetch(
-                "/api/history"
-            );
 
         const data =
             await response.json();
 
-        if (
-            !data.history ||
-            !data.history.length
-        ) {
 
-            container.innerHTML =
-                "<p class='muted'>No previous analyses.</p>";
+        if (!response.ok) {
 
             return;
+
         }
 
-        container.innerHTML = `
-            <div style="overflow-x:auto">
 
-                <table>
+        const knowledge =
+            data.stats ||
+            data;
 
-                    <thead>
 
-                        <tr>
-                            <th>ID</th>
-                            <th>Source</th>
-                            <th>Lines</th>
-                            <th>Errors</th>
-                            <th>Critical</th>
-                            <th>Warnings</th>
-                            <th>Unique</th>
-                            <th>Created</th>
-                        </tr>
+        $("knowledgeTotal")
+            .textContent =
+            knowledge.total || 0;
 
-                    </thead>
 
-                    <tbody>
+        $("knowledgeBuiltIn")
+            .textContent =
+            knowledge.built_in || 0;
 
-                        ${
-                            data.history
-                                .map(
-                                    item => `
-                                    <tr>
 
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.id)
-                                            )}
-                                        </td>
+        $("knowledgeLearned")
+            .textContent =
+            knowledge.learned || 0;
 
-                                        <td>
-                                            ${escapeHtml(
-                                                item.source_name
-                                            )}
-                                        </td>
 
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.total_lines)
-                                            )}
-                                        </td>
+        $("knowledgeConfidence")
+            .textContent =
+            `${Math.round(
+                Number(
+                    knowledge.average_confidence ||
+                    0
+                ) * 100
+            )}%`;
 
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.total_errors)
-                                            )}
-                                        </td>
-
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.critical)
-                                            )}
-                                        </td>
-
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.warnings)
-                                            )}
-                                        </td>
-
-                                        <td>
-                                            ${escapeHtml(
-                                                String(item.unique_errors)
-                                            )}
-                                        </td>
-
-                                        <td>
-                                            ${escapeHtml(
-                                                item.created_at
-                                            )}
-                                        </td>
-
-                                    </tr>
-                                    `
-                                )
-                                .join("")
-                        }
-
-                    </tbody>
-
-                </table>
-
-            </div>
-        `;
-
-    } catch (error) {
-
-        container.innerHTML =
-            `<p>${escapeHtml(
-                error.message
-            )}</p>`;
     }
+
+    catch {
+
+    }
+
 }
 
 
-function escapeHtml(value) {
-
-    return String(
-        value ?? ""
-    )
-        .replace(
-            /&/g,
-            "&amp;"
-        )
-        .replace(
-            /</g,
-            "&lt;"
-        )
-        .replace(
-            />/g,
-            "&gt;"
-        )
-        .replace(
-            /"/g,
-            "&quot;"
-        )
-        .replace(
-            /'/g,
-            "&#039;"
-        );
-}
-
+/* ================================================= */
+/* INITIAL LOAD */
+/* ================================================= */
 
 loadHistory();
+
 loadKnowledge();
